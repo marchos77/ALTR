@@ -1,0 +1,407 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Parameters": {
+		"amazon": {
+			"Description": "Image (default: amazon linux, us-east-2)",
+			"Type": "String",
+			"Default": "ami-09246ddb00c7c4fef "
+		}
+	},
+	"Resources": {
+		"publicSubnet2a": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"CidrBlock": "172.18.1.0/24",
+				"AvailabilityZone": "us-east-2a",
+				"Tags": [{
+					"Key": "name",
+					"Value": "Public2a"
+				}]
+			},
+			"DependsOn": [
+				"vpc"
+			]
+		},
+		"privateSubnet2a": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"CidrBlock": "172.18.10.0/24",
+				"AvailabilityZone": "us-east-2a",
+				"Tags": [{
+					"Key": "name",
+					"Value": "Private2a"
+				}]
+			},
+			"DependsOn": [
+				"vpc"
+			]
+		},
+		"publicSubnet2b": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"CidrBlock": "172.18.2.0/24",
+				"AvailabilityZone": "us-east-2b",
+				"Tags": [{
+					"Key": "name",
+					"Value": "Public2b"
+				}]
+			},
+			"DependsOn": [
+				"vpc"
+			]
+		},
+		"privateSubnet2b": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"CidrBlock": "172.18.20.0/24",
+				"AvailabilityZone": "us-east-2b",
+				"Tags": [{
+					"Key": "name",
+					"Value": "Private2b"
+				}]
+			},
+			"DependsOn": [
+				"vpc"
+			]
+		},
+		"vpc": {
+			"Type": "AWS::EC2::VPC",
+			"Properties": {
+				"CidrBlock": "172.18.0.0/16",
+				"EnableDnsSupport": "true",
+				"EnableDnsHostnames": "true"
+			}
+		},
+		"igw": {
+			"Type": "AWS::EC2::InternetGateway",
+			"Properties": {},
+			"DependsOn": ["vpc"]
+		},
+		"nat": {
+			"Type": "AWS::EC2::NatGateway",
+			"Properties": {
+				"AllocationId": {
+					"Fn::GetAtt": ["NatEIP", "AllocationId"]
+				},
+				"SubnetId": {
+					"Ref": "publicSubnet2a"
+				}
+			},
+			"DependsOn": [
+				"publicSubnet2a",
+				"ELBSG",
+				"igw",
+				"NatEIP",
+				"igwAttachment"
+			]
+		},
+		"igwAttachment": {
+			"Type": "AWS::EC2::VPCGatewayAttachment",
+			"Properties": {
+				"InternetGatewayId": {
+					"Ref": "igw"
+				},
+				"VpcId": {
+					"Ref": "vpc"
+				}
+			},
+			"DependsOn": [
+				"igw",
+				"vpc"
+			]
+		},
+		"privateRtb": {
+			"Type": "AWS::EC2::RouteTable",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"Tags": [{
+					"Key": "name",
+					"Value": "PrivateRT"
+				}]
+			},
+			"DependsOn": ["vpc"]
+		},
+		"routeToNat": {
+			"Type": "AWS::EC2::Route",
+			"Properties": {
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"NatGatewayId": {
+					"Ref": "nat"
+				},
+				"RouteTableId": {
+					"Ref": "privateRtb"
+				}
+			},
+			"DependsOn": [
+				"nat",
+				"privateRtb"
+			]
+		},
+		"privateRtbAssociation": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "privateRtb"
+				},
+				"SubnetId": {
+					"Ref": "privateSubnet2a"
+				}
+			},
+			"DependsOn": [
+				"privateRtb",
+				"privateSubnet2a"
+			]
+		},
+		"privateRtbAssociation1": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "privateRtb"
+				},
+				"SubnetId": {
+					"Ref": "privateSubnet2b"
+				}
+			},
+			"DependsOn": [
+				"privateRtb",
+				"privateSubnet2b"
+			]
+		},
+		"publicRtb": {
+			"Type": "AWS::EC2::RouteTable",
+			"Properties": {
+				"VpcId": {
+					"Ref": "vpc"
+				},
+				"Tags": [{
+					"Key": "name",
+					"Value": "PublicRT"
+				}]
+			},
+			"DependsOn": ["vpc"]
+		},
+		"routeToIgw": {
+			"Type": "AWS::EC2::Route",
+			"Properties": {
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"GatewayId": {
+					"Ref": "igw"
+				},
+				"RouteTableId": {
+					"Ref": "publicRtb"
+				}
+			},
+			"DependsOn": [
+				"nat",
+				"privateRtb"
+			]
+		},
+		"publicRtbAssociation": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "publicRtb"
+				},
+				"SubnetId": {
+					"Ref": "publicSubnet2a"
+				}
+			},
+			"DependsOn": [
+				"publicRtb",
+				"publicSubnet2a"
+			]
+		},
+		"publicRtbAssociation1": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "publicRtb"
+				},
+				"SubnetId": {
+					"Ref": "publicSubnet2b"
+				}
+			},
+			"DependsOn": [
+				"publicRtb",
+				"publicSubnet2b"
+			]
+		},
+		"NatEIP": {
+			"Type": "AWS::EC2::EIP",
+			"Properties": {
+				"Domain": {
+					"Ref": "vpc"
+				}
+			}
+		},
+		"WebServerSG": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "default",
+				"SecurityGroupEgress": [{
+					"CidrIp": "0.0.0.0/0",
+					"IpProtocol": "-1"
+				}],
+				"SecurityGroupIngress": [{
+					"CidrIp": "172.18.0.0/16",
+					"FromPort": "80",
+					"IpProtocol": "tcp",
+					"ToPort": "80"
+				}, {
+					"CidrIp": "0.0.0.0/0",
+					"FromPort": "443",
+					"IpProtocol": "tcp",
+					"ToPort": "443"
+				},{
+					"CidrIp": "0.0.0.0/0",
+					"FromPort": "8",
+					"IpProtocol": "icmp",
+					"ToPort": "-1"
+				}],
+				"VpcId": {
+					"Ref": "vpc"
+				}
+			}
+		},
+		"ELBSG": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "default",
+				"SecurityGroupEgress": [{
+					"CidrIp": "0.0.0.0/0",
+					"IpProtocol": "-1"
+				}],
+				"SecurityGroupIngress": [{
+					"CidrIp": "0.0.0.0/0",
+					"FromPort": "80",
+					"IpProtocol": "tcp",
+					"ToPort": "80"
+				}, {
+					"CidrIp": "0.0.0.0/0",
+					"FromPort": "443",
+					"IpProtocol": "tcp",
+					"ToPort": "443"
+				}],
+				"VpcId": {
+					"Ref": "vpc"
+				}
+			}
+		},
+		"WebServer": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"ImageId": {
+					"Ref": "amazon"
+				},
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": ["", [
+						"#!/bin/bash -ex\n",
+						"sudo yum update -y\n",
+						"sudo yum install httpd -y\n",
+						"systemctl enable httpd\n",
+						"systemctl start httpd\n",
+              			"usermod -a -G apache ec2-user\n",
+              			"chown -R ec2-user:apache /var/www\n",
+              			"chmod 2775 /var/www\n",
+              			"echo \"<html><h1>Hello Zero!</h1></html>\" >> ~/index.html\n",
+              			"sudo mv ~/index.html /var/www/html\n",
+              			"systemctl restart httpd\n"
+              		]]
+					}
+				},
+				"Tags" : [
+					{
+						"Key" : "Name",
+						"Value" : "WebServer"
+					}],
+				"InstanceType": "t2.micro",
+				"KeyName": "samsung7",
+				"NetworkInterfaces": [{
+					"NetworkInterfaceId": {
+						"Ref": "WebServerEni"
+					},
+					"DeviceIndex": "0"
+				}]
+			},
+			"DependsOn": [
+				"vpc",
+				"WebServerSG",
+				"privateSubnet2a",
+				"nat",
+				"igw"
+			]
+		},
+		"WebServerEni": {
+			"Type": "AWS::EC2::NetworkInterface",
+			"Properties": {
+				"SubnetId": {
+					"Ref": "privateSubnet2a"
+				},
+				"Description": "Interface for WebServer",
+				"GroupSet": [{
+					"Ref": "WebServerSG"
+				}],
+				"SourceDestCheck": "false",
+				"Tags": [{
+					"Key": "Name",
+					"Value": "WebServer"
+				}]
+			}
+		},
+		"ALTRELB" : {
+	    	"Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+	    	"Properties": {
+		        "CrossZone": "true",
+		        "Scheme": "internet-facing",
+		        "Subnets": [{"Ref": "publicSubnet2b"}, {"Ref": "publicSubnet2a"}],
+		        "SecurityGroups": [{"Ref": "ELBSG"}],
+		        "Instances": [{"Ref": "WebServer"}],
+		        "Listeners": [{
+		            "InstancePort": "80",
+		            "InstanceProtocol": "HTTP",
+		            "LoadBalancerPort": "80",
+		            "Protocol": "HTTP"
+		        }],
+		        "HealthCheck": {
+		            "Target": "HTTP:80/",
+		            "HealthyThreshold": "2",
+		            "UnhealthyThreshold": "3",
+		            "Interval": "10",
+		            "Timeout": "5"
+		        }
+	    	},
+
+			"DependsOn": [
+				"vpc",
+				"WebServer",
+				"ELBSG",
+				"publicSubnet2a",
+				"publicSubnet2b"]
+		}
+	},
+	"Outputs" : {
+	  "ALTRELBDNSName" : {
+	    "Description": "The DNSName of the ALTR load balancer",  
+	    "Value" : { "Fn::GetAtt" : [ "ALTRELB", "DNSName" ]}
+	  },
+	  "InstanceID" : {
+	    "Description": "The Instance ID",  
+	    "Value" : { "Ref" : "WebServer" }
+	  }
+	}
+}
