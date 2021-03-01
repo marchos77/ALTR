@@ -3,7 +3,7 @@ Parameters:
   amazon:
     Description: 'Image (default: amazon linux, us-east-2)'
     Type: String
-    Default: 'ami-09246ddb00c7c4fef '
+    Default: 'ami-09246ddb00c7c4fef'
 Resources:
   publicSubnet2a:
     Type: AWS::EC2::Subnet
