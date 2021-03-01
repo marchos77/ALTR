@@ -194,6 +194,7 @@ Resources:
               - Action:
                   - 'ec2:*'
                   - 'elasticloadbalancing:*'
+                  - 'iam:*'
                 Effect: Allow
                 Resource: '*'
               
